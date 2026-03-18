@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JS Console</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: #1e1e2e;
+            color: #cdd6f4;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: #181825;
+            border-bottom: 1px solid #313244;
+        }
+
+        header h1 {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        #run-btn {
+            padding: 8px 24px;
+            background: #a6e3a1;
+            color: #1e1e2e;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        #run-btn:hover { background: #94e2d5; }
+
+        .panels {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .divider {
+            width: 6px;
+            background: #313244;
+            cursor: col-resize;
+            flex-shrink: 0;
+            transition: background 0.15s;
+        }
+
+        .divider:hover, .divider.active {
+            background: #a6adc8;
+        }
+
+        .panel-header {
+            padding: 8px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #a6adc8;
+            background: #181825;
+            border-bottom: 1px solid #313244;
+        }
+
+        #editor-container {
+            flex: 1;
+        }
+
+        #console-output {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .log-line { color: #cdd6f4; }
+        .warn-line { color: #f9e2af; }
+        .error-line { color: #f38ba8; }
+        .info-line { color: #89b4fa; }
+        .result-line { color: #a6adc8; font-style: italic; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>JS Console</h1>
+        <button id="run-btn">Run</button>
+    </header>
+    <div class="panels">
+        <div class="panel" id="left-panel">
+            <div class="panel-header">Code</div>
+            <div id="editor-container"></div>
+        </div>
+        <div class="divider" id="divider"></div>
+        <div class="panel" id="right-panel">
+            <div class="panel-header">Console Output</div>
+            <div id="console-output"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+    <script>
+        const consoleOutput = document.getElementById('console-output');
+        const runBtn = document.getElementById('run-btn');
+        let editor;
+
+        require.config({
+            paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs' }
+        });
+
+        require(['vs/editor/editor.main'], function () {
+            monaco.editor.defineTheme('catppuccin', {
+                base: 'vs-dark',
+                inherit: true,
+                rules: [],
+                colors: {
+                    'editor.background': '#1e1e2e',
+                    'editor.foreground': '#cdd6f4',
+                    'editorLineNumber.foreground': '#6c7086',
+                    'editorLineNumber.activeForeground': '#a6adc8',
+                    'editor.selectionBackground': '#45475a',
+                    'editor.lineHighlightBackground': '#21213380',
+                }
+            });
+
+            const defaultCode = "console.log('Hello, world!');\nconsole.log(2 + 2);\nconsole.warn('This is a warning');\nconsole.error('This is an error');";
+            const savedCode = localStorage.getItem('js-console-code');
+
+            editor = monaco.editor.create(document.getElementById('editor-container'), {
+                value: savedCode !== null ? savedCode : defaultCode,
+                language: 'javascript',
+                theme: 'catppuccin',
+                fontSize: 14,
+                fontFamily: "'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace",
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                padding: { top: 16 },
+            });
+
+            editor.addAction({
+                id: 'run-code',
+                label: 'Run Code',
+                keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter],
+                run: runCode,
+            });
+
+            editor.getModel().onDidChangeContent(() => {
+                localStorage.setItem('js-console-code', editor.getValue());
+            });
+        });
+
+        function addLine(text, className) {
+            const div = document.createElement('div');
+            div.className = className;
+            div.textContent = text;
+            consoleOutput.appendChild(div);
+        }
+
+        function formatArgs(args) {
+            return args.map(arg => {
+                if (typeof arg === 'object') {
+                    try { return JSON.stringify(arg, null, 2); }
+                    catch { return String(arg); }
+                }
+                return String(arg);
+            }).join(' ');
+        }
+
+        function runCode() {
+            consoleOutput.innerHTML = '';
+            const code = editor.getValue();
+
+            const fakeConsole = {
+                log: (...args) => addLine(formatArgs(args), 'log-line'),
+                warn: (...args) => addLine(formatArgs(args), 'warn-line'),
+                error: (...args) => addLine(formatArgs(args), 'error-line'),
+                info: (...args) => addLine(formatArgs(args), 'info-line'),
+            };
+
+            try {
+                const fn = new Function('console', code);
+                const result = fn(fakeConsole);
+                if (result !== undefined) {
+                    addLine('← ' + formatArgs([result]), 'result-line');
+                }
+            } catch (e) {
+                addLine(e.toString(), 'error-line');
+            }
+        }
+
+        runBtn.addEventListener('click', runCode);
+
+        // Resizable panels
+        const divider = document.getElementById('divider');
+        const leftPanel = document.getElementById('left-panel');
+        const rightPanel = document.getElementById('right-panel');
+        const panels = document.querySelector('.panels');
+
+        let isDragging = false;
+
+        divider.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            divider.classList.add('active');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const rect = panels.getBoundingClientRect();
+            const offset = e.clientX - rect.left;
+            const total = rect.width - 6; // subtract divider width
+            const pct = Math.min(Math.max(offset / rect.width * 100, 15), 85);
+            leftPanel.style.flex = 'none';
+            rightPanel.style.flex = 'none';
+            leftPanel.style.width = pct + '%';
+            rightPanel.style.width = (100 - pct) + '%';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!isDragging) return;
+            isDragging = false;
+            divider.classList.remove('active');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        });
+    </script>
+</body>
+</html>
