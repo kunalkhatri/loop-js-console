@@ -1,0 +1,17 @@
+{
+  "name": "loop91 JS Console",
+  "short_name": "JS Console",
+  "description": "A browser-based JavaScript console with Monaco editor",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1e1e2e",
+  "theme_color": "#181825",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
